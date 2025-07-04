@@ -5,6 +5,7 @@ import UserFactory, { Role } from '../Factory/UserFactory';
 import EventModel from '../models/event.model';
 import Event from '../Actions/Event';
 import { requireAuth, AuthenticatedRequest } from '../utils/authMiddleware';
+import User from'../Factory/User';
 
 const router = Router();
 
@@ -19,8 +20,8 @@ const asyncHandler = (fn: (req: Request, res: Response) => Promise<void>) => {
 };
 
 // Helper function to get user from database
-const getUserFromDatabase = async (userId: string) => {
-  const userDoc = await UserModel.findById(userId);
+const getUserFromDatabase = async (createdBy: string) => {
+  const userDoc = await UserModel.findById(createdBy);
   if (!userDoc) {
     throw new Error('User not found');
   }
@@ -29,19 +30,36 @@ const getUserFromDatabase = async (userId: string) => {
 };
 
 // CREATE EVENT ROUTE
+// CREATE EVENT ROUTE with debug logging
+// FIXED CREATE EVENT ROUTE
+// FIXED CREATE EVENT ROUTE
+// FIXED CREATE EVENT ROUTE
 router.post('/create', asyncHandler(async (req: Request, res: Response) => {
-  const { userId, ...eventData } = req.body;
+  console.log('Request received:', req.body);
   
-  if (!userId) {
-    res.status(400).json({ success: false, error: 'Missing userId' });
+  const { createdBy } = req.body;
+  
+  if (!createdBy) {
+    res.status(400).json({ success: false, error: 'Missing createdBy' });
     return;
   }
 
   try {
-    const user = await getUserFromDatabase(userId);
-    const createdEvent = await EventService.createEvent(eventData, user);
+    console.log('Getting user with ID:', createdBy);
+    const user = await getUserFromDatabase(createdBy);
+    console.log('User found:', user);
+    
+    console.log('About to create event with data:', JSON.stringify(req.body, null, 2));
+    console.log('createdBy field exists:', 'createdBy' in req.body);
+    console.log('createdBy value:', req.body.createdBy);
+    
+    // Pass the entire req.body - it already contains all required fields including createdBy
+    const createdEvent = await EventService.createEvent(req.body, user);
+    
+    console.log('Event created successfully');
     res.status(201).json({ success: true, event: createdEvent });
   } catch (error: any) {
+    console.log('Error occurred:', error.message);
     if (error.message === 'User not found') {
       res.status(404).json({ success: false, error: error.message });
     } else if (error.name === 'ValidationError' || error.name === 'BusinessRuleError') {
@@ -53,15 +71,14 @@ router.post('/create', asyncHandler(async (req: Request, res: Response) => {
     }
   }
 }));
-
 // EDIT EVENT ROUTE
 router.put('/edit/:id', asyncHandler(async (req: Request, res: Response) => {
-  const { userId, ...updates } = req.body;
+  const { createdBy, ...updates } = req.body;
   const eventId = req.params.id;
 
   // Validate required fields
-  if (!userId) {
-    res.status(400).json({ success: false, error: 'Missing userId' });
+  if (!createdBy) {
+    res.status(400).json({ success: false, error: 'Missing createdBy' });
     return;
   }
 
@@ -72,7 +89,7 @@ router.put('/edit/:id', asyncHandler(async (req: Request, res: Response) => {
 
   try {
     // Fetch user and event from DB
-    const user = await getUserFromDatabase(userId);
+    const user = await getUserFromDatabase(createdBy);
     
     const eventDoc = await EventModel.findById(eventId);
     if (!eventDoc) {
